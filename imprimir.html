@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3. Impresión — Constancia de alumno regular</title>
+<link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+<div class="pagina">
+  <div class="cabecera-app no-imprimir">
+    <h1 id="inst"></h1>
+    <div class="pasos"><span>1. Datos</span><span>2. Certificado y pago</span><span class="activo">3. Impresión</span></div>
+  </div>
+  <div class="barra no-imprimir">
+    <button class="btn" id="imprimir">Imprimir constancia</button>
+    <a class="btn sec" id="volver" href="index.html">Cargar otro alumno</a>
+  </div>
+  <main class="hoja" id="hoja"></main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="comun.js"></script>
+<script>
+  (async () => {
+    const id = idURL();
+    let d = null;
+    try { d = await cargarConstancia(id); } catch (e) { console.error(e); }
+
+    if (!d) { location.replace("index.html"); return; }
+    // Sin pago confirmado en la base de datos no se imprime
+    if (!d.pagado) { location.replace("certificado.html?id=" + id); return; }
+
+    $("inst").textContent = CONFIG.institucion;
+    pintarCertificado($("hoja"), d, true);
+    $("imprimir").addEventListener("click", () => window.print());
+  })();
+</script>
+</body>
+</html>

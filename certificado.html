@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>2. Certificado y pago — Constancia de alumno regular</title>
+<link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+<div class="pagina">
+  <div class="cabecera-app">
+    <h1 id="inst"></h1>
+    <div class="pasos"><span>1. Datos</span><span class="activo">2. Certificado y pago</span><span>3. Impresión</span></div>
+  </div>
+
+  <div class="dos-col">
+    <aside class="panel pago">
+      <h2>Pago de la constancia</h2>
+      <div class="monto" id="monto"></div>
+      <div>Alias para transferir:</div>
+      <div class="alias" id="alias"></div>
+      <div id="qr"></div>
+      <div class="hint">Pagá con el QR o transfiriendo al alias. Cuando recibas el comprobante, confirmá el pago para pasar a la impresión.</div>
+      <div class="err" id="err" role="alert"></div>
+      <button class="btn" id="pagado">Confirmar pago recibido</button>
+      <a class="btn sec" id="editar" href="index.html">Editar datos</a>
+    </aside>
+    <main class="hoja" id="hoja"></main>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script src="qr.js"></script>
+<script src="comun.js"></script>
+<script>
+  (async () => {
+    const id = idURL();
+    let d = null;
+    try { d = await cargarConstancia(id); } catch (e) { console.error(e); }
+    if (!d) { location.replace("index.html"); return; }
+
+    $("inst").textContent = CONFIG.institucion;
+    $("monto").textContent = "$" + CONFIG.monto.toLocaleString("es-AR");
+    $("alias").textContent = CONFIG.alias;
+    $("editar").href = "index.html?id=" + id;
+    pintarCertificado($("hoja"), d, false);
+
+    if (CONFIG.qrImagen) $("qr").innerHTML = `<img src="${CONFIG.qrImagen}" alt="QR de pago">`;
+    else dibujarQR($("qr"), `Pago constancia alumno regular | Alias: ${CONFIG.alias} | Monto: $${CONFIG.monto} | DNI: ${d.dni}`, 220);
+
+    // Si ya estaba pagado, no hace falta volver a confirmar
+    if (d.pagado) { location.replace("imprimir.html?id=" + id); return; }
+
+    $("pagado").addEventListener("click", async () => {
+      $("pagado").disabled = true;
+      const { data, error } = await db.rpc("confirmar_pago", { p_id: id });
+      if (error || !data) {
+        console.error(error);
+        $("err").textContent = "No se pudo confirmar el pago. Intentá de nuevo.";
+        $("pagado").disabled = false;
+        return;
+      }
+      location.href = "imprimir.html?id=" + id;
+    });
+  })();
+</script>
+</body>
+</html>

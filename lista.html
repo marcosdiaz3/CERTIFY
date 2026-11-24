@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Constancias registradas</title>
+  <link rel="stylesheet" href="css/estilos.css">
+  <style>
+    
+  </style>
+</head>
+
+<body>
+  <div class="pagina">
+    <div class="cabecera-app">
+      <h1 id="inst"></h1>
+      <div class="acciones">
+        <a class="btn sec" href="inicio.html">Inicio</a>
+        <button class="btn sec" id="salir" hidden>Cerrar sesión</button>
+      </div>
+    </div>
+
+    <!-- Acceso del personal -->
+    <section class="panel form login" id="vistaLogin" hidden>
+      <h2>Acceso del personal</h2>
+      <label for="email">Correo</label>
+      <input id="email" type="email" autocomplete="username">
+      <label for="clave">Contraseña</label>
+      <input id="clave" type="password" autocomplete="current-password">
+      <div class="err" id="errLogin" role="alert"></div>
+      <button class="btn" id="entrar">Ingresar</button>
+    </section>
+
+    <!-- Listado -->
+    <section id="vistaLista" hidden>
+      <div class="resumen">
+        <div class="dato"><b id="nTotal">0</b><span>Solicitudes</span></div>
+        <div class="dato ok"><b id="nPagadas">0</b><span>Pagadas</span></div>
+        <div class="dato"><b id="nPend">0</b><span>Pendientes de pago</span></div>
+      </div>
+
+      <div class="filtros">
+        <div>
+          <label for="buscar">Buscar por nombre, apellido, DNI o carrera</label>
+          <input id="buscar" type="search" placeholder="Escribí para filtrar">
+        </div>
+        <div>
+          <label for="estado">Estado de pago</label>
+          <select id="estado">
+            <option value="">Todos</option>
+            <option value="si">Pagadas</option>
+            <option value="no">Pendientes</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="acciones" style="margin-bottom:14px">
+        <button class="btn" id="recargar">Actualizar</button>
+        <button class="btn sec" id="csv">Exportar CSV</button>
+        <span class="hint" id="estadoCarga" role="status"></span>
+      </div>
+
+      <div class="tabla-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Apellido y nombre</th>
+              <th>DNI</th>
+              <th>Carrera</th>
+              <th>Fecha del certificado</th>
+              <th>Estado</th>
+              <th>Registrado</th>
+            </tr>
+          </thead>
+          <tbody id="filas"></tbody>
+        </table>
+        <div class="vacio" id="vacio" hidden>No hay constancias que coincidan.</div>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
+  <script src="comun.js"></script>
+  <script>
+    let registros = [];
+    let visibles = [];
+
+    $("inst").textContent = CONFIG.institucion;
+
+    const fmtFechaHora = iso => new Date(iso).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+
+    function mostrar(sesion) {
+      $("vistaLogin").hidden = !!sesion;
+      $("vistaLista").hidden = !sesion;
+      $("salir").hidden = !sesion;
+      if (sesion) cargar();
+    }
+
+    async function cargar() {
+      $("estadoCarga").textContent = "Cargando…";
+      $("recargar").disabled = true;
+      const { data, error } = await db.from("constancias")
+        .select("*").order("created_at", { ascending: false });
+      $("recargar").disabled = false;
+      if (error) {
+        console.error(error);
+        $("estadoCarga").textContent = "No se pudo cargar. Verificá la política de lectura en Supabase.";
+        return;
+      }
+      registros = data || [];
+      $("estadoCarga").textContent = "Actualizado " + new Date().toLocaleTimeString("es-AR", { timeStyle: "short" });
+      resumen();
+      filtrar();
+    }
+
+    function resumen() {
+      const pagadas = registros.filter(r => r.pagado).length;
+      $("nTotal").textContent = registros.length;
+      $("nPagadas").textContent = pagadas;
+      $("nPend").textContent = registros.length - pagadas;
+    }
+
+    const norm = s => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+    function filtrar() {
+      const q = norm($("buscar").value.trim());
+      const est = $("estado").value;
+      visibles = registros.filter(r => {
+        if (est === "si" && !r.pagado) return false;
+        if (est === "no" && r.pagado) return false;
+        return !q || norm(`${r.nombre} ${r.apellido} ${r.dni} ${r.carrera}`).includes(q);
+      });
+      $("filas").innerHTML = visibles.map(r => `
+      <tr>
+        <td><b>${esc(r.apellido.toUpperCase())}</b>, ${esc(titulo(r.nombre))}</td>
+        <td>${esc(puntosDNI(r.dni))}</td>
+        <td>${esc(titulo(r.carrera))}</td>
+        <td>${esc(fechaLarga(r.fecha))}</td>
+        <td><span class="estado ${r.pagado ? "si" : "no"}">${r.pagado ? "Pagada" : "Pendiente"}</span>
+            ${r.pagado && r.pagado_en ? `<div class="hint">${esc(fmtFechaHora(r.pagado_en))}</div>` : ""}</td>
+        <td>${esc(fmtFechaHora(r.created_at))}</td>
+      </tr>`).join("");
+      $("vacio").hidden = visibles.length > 0;
+    }
+
+    function exportarCSV() {
+      const celda = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const cab = ["Apellido", "Nombre", "DNI", "Carrera", "Fecha certificado", "Pagado", "Pagado en", "Registrado"];
+      const filas = visibles.map(r => [r.apellido, r.nombre, r.dni, r.carrera, r.fecha,
+      r.pagado ? "Sí" : "No", r.pagado_en || "", r.created_at]);
+      const csv = "\ufeff" + [cab, ...filas].map(f => f.map(celda).join(";")).join("\r\n");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+      a.download = "constancias.csv";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    async function entrar() {
+      $("errLogin").textContent = "";
+      $("entrar").disabled = true;
+      const { error } = await db.auth.signInWithPassword({ email: $("email").value.trim(), password: $("clave").value });
+      $("entrar").disabled = false;
+      if (error) { $("errLogin").textContent = "Correo o contraseña incorrectos."; return; }
+      $("clave").value = "";
+    }
+
+    $("entrar").addEventListener("click", entrar);
+    $("clave").addEventListener("keydown", e => { if (e.key === "Enter") entrar(); });
+    $("salir").addEventListener("click", () => db.auth.signOut());
+    $("recargar").addEventListener("click", cargar);
+    $("csv").addEventListener("click", exportarCSV);
+    $("buscar").addEventListener("input", filtrar);
+    $("estado").addEventListener("change", filtrar);
+
+    db.auth.onAuthStateChange((_evento, sesion) => mostrar(sesion));
+    db.auth.getSession().then(({ data }) => mostrar(data.session));
+  </script>
+</body>
+
+</html>

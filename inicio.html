@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Constancia de alumno regular — Inicio</title>
+  <link rel="stylesheet" href="css/estilos.css">
+  <style>
+  </style>
+</head>
+
+<body>
+  <div class="pagina">
+    <main class="portada">
+      <div class="inst" id="inst"></div>
+      <div class="sub" id="sub"></div>
+      <h1>Constancia de alumno regular</h1>
+      <div class="opciones">
+        <a class="opcion" href="index.html">
+          <h2>Solicitar constancia</h2>
+          <p>Cargá tus datos, pagá y descargá tu constancia lista para imprimir.</p>
+          <span class="btn">Cargar mis datos</span>
+        </a>
+        <a class="opcion alt" href="lista.html">
+          <h2>Constancias registradas</h2>
+          <p>Consultá el listado de solicitudes guardadas y su estado de pago. Acceso solo para personal.</p>
+          <span class="btn">Ver listado</span>
+        </a>
+      </div>
+    </main>
+  </div>
+  <script src="config.js"></script>
+  <script>
+    document.getElementById("inst").textContent = CONFIG.institucion;
+    document.getElementById("sub").textContent = CONFIG.subtitulo;
+  </script>
+</body>
+
+</html>
